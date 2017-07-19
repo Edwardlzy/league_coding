@@ -110,13 +110,59 @@ def hardestChampionAgainst(summonerName, APIKey):
     return champIDToName(resultID, APIKey)
 
 
+# Get recent 50 ranked games if exist. Otherwise get all ranked games.
+'''
+"lane": "BOTTOM",
+"gameId": 2014170160,
+"champion": 18,
+"platformId": "NA1",
+"timestamp": 1447965520293,
+"queue": 4,
+"role": "DUO_CARRY",
+"season": 6
+'''
+def getRecentRankedGames(summonerName, APIKey):
+    ranked_URL = "https://na1.api.riotgames.com/lol/match/v3/matchlists/by-account/" \
+                 + str(getAccountID(summonerName, APIKey)) + "?api_key=" + APIKey
+    ranked_response = requests.get(ranked_URL).json()
+    ranked_matches = ranked_response["matches"][:50] if ranked_response["totalGames"] >= 50 else ranked_response["matches"]
+    return ranked_matches
+
+
+# Get the number of each lane played by the summoner in the most recent 50 ranked games.
+def getLaneFrequency(summonerName, APIKey):
+    lane_dict = {'TOP': 0, 'JUNGLE': 0, 'MID': 0, 'ADC': 0, 'SUPPORT': 0}
+    ranked_matches = getRecentRankedGames(summonerName, APIKey)
+    total_games = len(ranked_matches)
+
+    for game in ranked_matches:
+        if game['lane'] == 'TOP':
+            lane_dict['TOP'] += 1
+        elif game['lane'] == 'JUNGLE':
+            lane_dict['JUNGLE'] += 1
+        elif game['lane'] == 'MID':
+            lane_dict['MID'] += 1
+        else:
+            if game['role'] == "DUO_SUPPORT":
+                lane_dict['SUPPORT'] += 1
+            elif game['role'] == "DUO_CARRY":
+                lane_dict['ADC'] += 1
+
+    for lane in lane_dict:
+        lane_dict[lane] = str(100 * (lane_dict[lane]/total_games)) + '%'
+
+    return lane_dict
+
+
 # Return the basic information of an ID's ranked games.
 def requestRankedData(ID, APIKey):
     URL = "https://na1.api.riotgames.com/lol/league/v3/positions/by-summoner/" + ID + "?api_key=" + APIKey
     # print (URL)
     response = requests.get(URL)
     return response.json()
-    
+
+
+
 
 def main():
     summonerName = (str)(input('Type your Summoner Name here and DO NOT INCLUDE ANY SPACES: '))
@@ -131,7 +177,10 @@ def main():
         print (responseJSON2[0]['rank'])
         print (responseJSON2[0]['leaguePoints'])
     print("Recently played", mostPlayedChampionRecently(summonerName, APIKey), "the most.")
-    print("Hardest against", hardestChampionAgainst(summonerName, APIKey))
+    # print("Hardest against", hardestChampionAgainst(summonerName, APIKey))
+    lane_dict = getLaneFrequency(summonerName, APIKey)
+    for i in lane_dict:
+        print(i, lane_dict[i])
 
 
 if __name__ == "__main__":
