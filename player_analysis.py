@@ -1,4 +1,5 @@
 import requests
+import heapq
 
 # Return the basic information of a summoner.
 '''
@@ -110,6 +111,49 @@ def hardestChampionAgainst(summonerName, APIKey):
     return champIDToName(resultID, APIKey)
 
 
+# Return the k champions that appear most frequently in the summoner's recent losing ranked games.
+def hardestKChampionsAgainstRanked(summonerName, APIKey, k=5):
+    champ_dict = {}
+    accountId = getAccountID(summonerName, APIKey)
+    gameIds = [match["gameId"] for match in getRecentRankedGames(summonerName, APIKey)]
+
+    for game in gameIds:
+        URL = "https://na1.api.riotgames.com/lol/match/v3/matches/" + str(game) + "?api_key=" + APIKey
+        gameData = requests.get(URL).json()
+
+        # Get the summoner's in-game Id.
+        pID = 0
+        for participant in gameData["participantIdentities"]:
+            if participant["player"]["accountId"] == accountId:
+                pID = participant["participantId"]
+                break
+
+        winTeam = 0
+        loseTeam = 0
+        for team in gameData["teams"]:
+            if team["win"] == "Win":
+                winTeam = team["teamId"]
+            else:
+                loseTeam = team["teamId"]
+
+        record = False
+        for pData in gameData["participants"]:
+            if pData["participantId"] == pID and pData["stats"]["win"] == False:
+                record = True
+                break
+
+        if record:
+            for participant in gameData["participants"]:
+                if participant["teamId"] == winTeam:
+                    if participant["championId"] not in champ_dict:
+                        champ_dict[participant["championId"]] = 1
+                    else:
+                        champ_dict[participant["championId"]] += 1
+
+    result_list = heapq.nlargest(k, champ_dict, key=champ_dict.get)
+    return champIDToName(result_list, APIKey)
+
+
 # Get recent 50 ranked games if exist. Otherwise get all ranked games.
 '''
 "lane": "BOTTOM",
@@ -168,19 +212,20 @@ def main():
     summonerName = (str)(input('Type your Summoner Name here and DO NOT INCLUDE ANY SPACES: '))
     APIKey = (str)(input('Copy and paste your API Key here: '))
 
-    responseJSON  = requestSummonerData(summonerName, APIKey)
-    ID = responseJSON['id']
-    ID = str(ID)
-    responseJSON2 = requestRankedData(ID, APIKey)
-    if responseJSON2 is not None:
-        print (responseJSON2[0]['tier'])
-        print (responseJSON2[0]['rank'])
-        print (responseJSON2[0]['leaguePoints'])
-    print("Recently played", mostPlayedChampionRecently(summonerName, APIKey), "the most.")
+    # responseJSON  = requestSummonerData(summonerName, APIKey)
+    # ID = responseJSON['id']
+    # ID = str(ID)
+    # responseJSON2 = requestRankedData(ID, APIKey)
+    # if responseJSON2 is not None:
+    #     print (responseJSON2[0]['tier'])
+    #     print (responseJSON2[0]['rank'])
+    #     print (responseJSON2[0]['leaguePoints'])
+    # print("Recently played", mostPlayedChampionRecently(summonerName, APIKey), "the most.")
     # print("Hardest against", hardestChampionAgainst(summonerName, APIKey))
-    lane_dict = getLaneFrequency(summonerName, APIKey)
-    for i in lane_dict:
-        print(i, lane_dict[i])
+    # lane_dict = getLaneFrequency(summonerName, APIKey)
+    # for i in lane_dict:
+    #     print(i, lane_dict[i])
+    print("In ranked games,", summonerName, "struggles the most with", hardestKChampionsAgainstRanked(summonerName, APIKey))
 
 
 if __name__ == "__main__":
